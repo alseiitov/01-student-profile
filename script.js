@@ -6,8 +6,6 @@
         id: 0,
         login: 'alseiitov',
         transactions: [],
-        progresses: [],
-        results: [],
         totalXP: 0
     }
 
@@ -15,7 +13,7 @@
         const response = await fetch(GRAPHQL_ENDPOINT, {
             method: "POST",
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: query, variables: variables }),
+            body: JSON.stringify({ query, variables }),
         })
 
         return await response.json()
@@ -76,87 +74,97 @@
     })
 
     document.getElementById('login').innerText = `login: ${student.login}`
-    document.getElementById('total-xp').innerText = `total xp: ${student.totalXP}`
+    document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
 
     const container = document.createElement('div')
 
     const svg = document.createElement('svg')
-    svg.classList.add('graph')
     container.append(svg)
+    svg.classList.add('graph')
 
     const xGrid = document.createElement('g')
-    xGrid.classList.add('grid', 'x-grid')
     svg.append(xGrid)
+    xGrid.classList.add('grid', 'x-grid')
 
     const xLine = document.createElement('line')
+    xGrid.append(xLine)
     xLine.setAttribute('x1', 100)
     xLine.setAttribute('x2', 100)
     xLine.setAttribute('y1', 0)
     xLine.setAttribute('y2', 500)
-    xGrid.append(xLine)
 
     const yGrid = document.createElement('g')
-    yGrid.classList.add('grid', 'y-grid')
     svg.append(yGrid)
+    yGrid.classList.add('grid', 'y-grid')
 
     const yLine = document.createElement('line')
+    yGrid.append(yLine)
     yLine.setAttribute('x1', 100)
     yLine.setAttribute('x2', 1100)
     yLine.setAttribute('y1', 500)
     yLine.setAttribute('y2', 500)
-    yGrid.append(yLine)
 
-    const months = student.transactions.map(transaction =>
-        (transaction.createdAt.getMonth() + 1) + '/' + transaction.createdAt.getFullYear()
-    ).filter((value, index, self) =>
-        self.indexOf(value) === index
-    )
+    const firstTransactionDate = student.transactions[0].createdAt
+    const lastTransactionDate = student.transactions[student.transactions.length - 1].createdAt
+    const firstAndLastDateDiff = lastTransactionDate.getTime() - firstTransactionDate.getTime()
+
+    const getMonths = (fromDate, toDate) => {
+        const fromYear = fromDate.getFullYear();
+        const fromMonth = fromDate.getMonth();
+        const toYear = toDate.getFullYear();
+        const toMonth = toDate.getMonth();
+        const months = [];
+        for (let year = fromYear; year <= toYear; year++) {
+            let month = year === fromYear ? fromMonth : 0;
+            const monthLimit = year === toYear ? toMonth : 11;
+            for (; month <= monthLimit; month++) {
+                months.push(month + 1 + '/' + year)
+            }
+        }
+        return months;
+    }
+
+    const months = getMonths(firstTransactionDate, lastTransactionDate)
 
     const xLabels = document.createElement('g')
-    xLabels.classList.add('labels', 'x-labels')
     svg.append(xLabels)
+    xLabels.classList.add('labels', 'x-labels')
 
     for (let i = 0; i < months.length; i++) {
-        const lable = document.createElement('text')
+        const label = document.createElement('text')
+        xLabels.append(label)
+        label.classList.add('date-label')
 
-        const x = (i * 1100 / months.length) + 100
+        const x = (i / (months.length - 1) * 1000) + 100
         const y = 530
 
-        lable.setAttribute('x', x)
-        lable.setAttribute('y', y)
+        label.setAttribute('x', x)
+        label.setAttribute('y', y)
 
-        lable.innerText = months[i]
-
-        xLabels.prepend(lable)
+        label.innerText = months[i]
     }
 
     const yLabels = document.createElement('g')
-    yLabels.classList.add('labels', 'y-labels')
     svg.append(yLabels)
+    yLabels.classList.add('labels', 'y-labels')
 
     for (let i = 0; i <= 10; i++) {
-        const lable = document.createElement('text')
+        const label = document.createElement('text')
+        yLabels.prepend(label)
 
         const x = 70
         const y = i == 0 ? 510 : 450 - ((10 - i) * 50) + 10
 
-        lable.setAttribute('x', x)
-        lable.setAttribute('y', y)
+        label.setAttribute('x', x)
+        label.setAttribute('y', y)
 
         const xp = i == 0 ? 0 : Math.round(student.totalXP / i)
-        lable.innerText = xp.toLocaleString()
-
-        yLabels.prepend(lable)
+        label.innerText = xp.toLocaleString()
     }
 
     const data = document.createElement('g')
-    data.classList.add('data')
     svg.append(data)
-
-    const firstTransactionDate = student.transactions[0].createdAt.getTime()
-    const firstAndLastDateDiff = student.transactions[student.transactions.length - 1].createdAt.getTime() - firstTransactionDate
-
-
+    data.classList.add('data')
 
     for (let i = 0; i < student.transactions.length - 1; i++) {
         const x1 = (student.transactions[i].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
@@ -165,12 +173,24 @@
         const y1 = student.transactions[i].totalXP / student.totalXP * 500
         const y2 = student.transactions[i + 1].totalXP / student.totalXP * 500
 
+        const circle = document.createElement('circle')
+        data.append(circle)
+        circle.setAttribute('cx', x2 + 100)
+        circle.setAttribute('cy', 500 - y2)
+        circle.setAttribute('r', 4)
+        circle.innerHTML = `
+        <title>
+            ${student.transactions[i].totalXP.toLocaleString()} XP
+            ${student.transactions[i].createdAt.toLocaleDateString()}
+        </title>
+        `
+
         const line = document.createElement('line')
+        data.append(line)
         line.setAttribute('x1', x1 + 100)
         line.setAttribute('x2', x2 + 100)
         line.setAttribute('y1', 500 - y1)
         line.setAttribute('y2', 500 - y2)
-        data.append(line)
     }
 
     document.body.innerHTML += container.innerHTML
