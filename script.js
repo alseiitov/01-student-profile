@@ -101,7 +101,7 @@
 
     const yLine = document.createElement('line')
     yLine.setAttribute('x1', 100)
-    yLine.setAttribute('x2', 1000)
+    yLine.setAttribute('x2', 1100)
     yLine.setAttribute('y1', 500)
     yLine.setAttribute('y2', 500)
     yGrid.append(yLine)
@@ -119,7 +119,7 @@
     for (let i = 0; i < months.length; i++) {
         const lable = document.createElement('text')
 
-        const x = (i * 1000 / months.length) + 100
+        const x = (i * 1100 / months.length) + 100
         const y = 530
 
         lable.setAttribute('x', x)
@@ -151,10 +151,27 @@
 
     const data = document.createElement('g')
     data.classList.add('data')
+    svg.append(data)
 
-    student.transactions.forEach(transaction => {
-        // TODO: add data 
-    })
+    const firstTransactionDate = student.transactions[0].createdAt.getTime()
+    const firstAndLastDateDiff = student.transactions[student.transactions.length - 1].createdAt.getTime() - firstTransactionDate
+
+
+
+    for (let i = 0; i < student.transactions.length - 1; i++) {
+        const x1 = (student.transactions[i].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
+        const x2 = (student.transactions[i + 1].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
+
+        const y1 = student.transactions[i].totalXP / student.totalXP * 500
+        const y2 = student.transactions[i + 1].totalXP / student.totalXP * 500
+
+        const line = document.createElement('line')
+        line.setAttribute('x1', x1 + 100)
+        line.setAttribute('x2', x2 + 100)
+        line.setAttribute('y1', 500 - y1)
+        line.setAttribute('y2', 500 - y2)
+        data.append(line)
+    }
 
     document.body.innerHTML += container.innerHTML
 })();
