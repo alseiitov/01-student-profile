@@ -84,9 +84,12 @@
         data: [],
     }
 
-    const firstTransactionDate = student.transactions[0].createdAt
-    const lastTransactionDate = student.transactions[student.transactions.length - 1].createdAt
-    const firstAndLastDateDiff = lastTransactionDate.getTime() - firstTransactionDate.getTime()
+    const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+    const getFirstDayOfNextMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 1);
+
+    const firstDate = getFirstDayOfMonth(student.transactions[0].createdAt)
+    const lastDate = getFirstDayOfNextMonth(student.transactions[student.transactions.length - 1].createdAt)
+    const firstAndLastDateDiff = lastDate.getTime() - firstDate.getTime()
 
     const getMonths = (fromDate, toDate) => {
         const fromYear = fromDate.getFullYear();
@@ -98,13 +101,17 @@
             let month = year === fromYear ? fromMonth : 0;
             const monthLimit = year === toYear ? toMonth : 11;
             for (; month <= monthLimit; month++) {
-                months.push(month + 1 + '/' + year)
+                months.push(
+                    (month.toString().length == 1 ? '0' + (month + 1) : (month + 1))
+                    + '/' +
+                    year.toString().substr(-2)
+                )
             }
         }
         return months;
     }
 
-    const months = getMonths(firstTransactionDate, lastTransactionDate)
+    const months = getMonths(firstDate, lastDate)
 
     for (let i = 0; i < months.length; i++) {
         const x = (i / (months.length - 1) * xpOverDateGraph.width) + xpOverDateGraph.leftOffset
@@ -116,8 +123,8 @@
     }
 
     for (let i = 0; i <= 10; i++) {
-        const x = xpOverDateGraph.leftOffset * 0.7
-        const y = i == 0 ? 510 : 450 - ((10 - i) * 50) + 10
+        const x = xpOverDateGraph.leftOffset * 0.8
+        const y = i == 0 ? xpOverDateGraph.height + 10 : xpOverDateGraph.height - 50 - ((10 - i) * 50) + 10
         const text = (i == 0 ? 0 : Math.round(student.totalXP / i)).toLocaleString()
         const type = 'y-label'
 
@@ -125,11 +132,11 @@
     }
 
     for (let i = 1; i < student.transactions.length; i++) {
-        const x1 = (student.transactions[i -1].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
-        const x2 = (student.transactions[i].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
+        const x1 = (student.transactions[i - 1].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const x2 = (student.transactions[i].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
 
-        const y1 = student.transactions[i - 1].totalXP / student.totalXP * 500
-        const y2 = student.transactions[i].totalXP / student.totalXP * 500
+        const y1 = student.transactions[i - 1].totalXP / student.totalXP * xpOverDateGraph.height
+        const y2 = student.transactions[i].totalXP / student.totalXP * xpOverDateGraph.height
 
         xpOverDateGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
@@ -213,7 +220,7 @@
                 el.setAttribute('y2', graph.topOffset - graph.data[i].y2)
             }
         }
-        
+
         document.body.innerHTML += container.innerHTML
     }
 
