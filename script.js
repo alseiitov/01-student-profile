@@ -61,7 +61,6 @@
         }
     }
 
-
     student.transactions.sort((a, b) =>
         new Date(a.createdAt) > new Date(b.createdAt) ? 1 : -1
     )
@@ -76,33 +75,14 @@
     document.getElementById('login').innerText = `login: ${student.login}`
     document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
 
-    const container = document.createElement('div')
-
-    const svg = document.createElement('svg')
-    container.append(svg)
-    svg.classList.add('graph')
-
-    const xGrid = document.createElement('g')
-    svg.append(xGrid)
-    xGrid.classList.add('grid', 'x-grid')
-
-    const xLine = document.createElement('line')
-    xGrid.append(xLine)
-    xLine.setAttribute('x1', 100)
-    xLine.setAttribute('x2', 100)
-    xLine.setAttribute('y1', 0)
-    xLine.setAttribute('y2', 500)
-
-    const yGrid = document.createElement('g')
-    svg.append(yGrid)
-    yGrid.classList.add('grid', 'y-grid')
-
-    const yLine = document.createElement('line')
-    yGrid.append(yLine)
-    yLine.setAttribute('x1', 100)
-    yLine.setAttribute('x2', 1100)
-    yLine.setAttribute('y1', 500)
-    yLine.setAttribute('y2', 500)
+    const xpOverDateGraph = {
+        width: 1000,
+        height: 500,
+        topOffset: 500,
+        leftOffset: 100,
+        labels: [],
+        data: [],
+    }
 
     const firstTransactionDate = student.transactions[0].createdAt
     const lastTransactionDate = student.transactions[student.transactions.length - 1].createdAt
@@ -126,72 +106,116 @@
 
     const months = getMonths(firstTransactionDate, lastTransactionDate)
 
-    const xLabels = document.createElement('g')
-    svg.append(xLabels)
-    xLabels.classList.add('labels', 'x-labels')
-
     for (let i = 0; i < months.length; i++) {
-        const label = document.createElement('text')
-        xLabels.append(label)
-        label.classList.add('date-label')
+        const x = (i / (months.length - 1) * xpOverDateGraph.width) + xpOverDateGraph.leftOffset
+        const y = xpOverDateGraph.height + 30
+        const text = months[i]
+        const type = 'x-label'
 
-        const x = (i / (months.length - 1) * 1000) + 100
-        const y = 530
-
-        label.setAttribute('x', x)
-        label.setAttribute('y', y)
-
-        label.innerText = months[i]
+        xpOverDateGraph.labels.push({ x, y, text, type })
     }
-
-    const yLabels = document.createElement('g')
-    svg.append(yLabels)
-    yLabels.classList.add('labels', 'y-labels')
 
     for (let i = 0; i <= 10; i++) {
-        const label = document.createElement('text')
-        yLabels.prepend(label)
-
-        const x = 70
+        const x = xpOverDateGraph.leftOffset * 0.7
         const y = i == 0 ? 510 : 450 - ((10 - i) * 50) + 10
+        const text = (i == 0 ? 0 : Math.round(student.totalXP / i)).toLocaleString()
+        const type = 'y-label'
 
-        label.setAttribute('x', x)
-        label.setAttribute('y', y)
-
-        const xp = i == 0 ? 0 : Math.round(student.totalXP / i)
-        label.innerText = xp.toLocaleString()
+        xpOverDateGraph.labels.push({ x, y, text, type })
     }
 
-    const data = document.createElement('g')
-    svg.append(data)
-    data.classList.add('data')
+    for (let i = 1; i < student.transactions.length; i++) {
+        const x1 = (student.transactions[i -1].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
+        const x2 = (student.transactions[i].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
 
-    for (let i = 0; i < student.transactions.length - 1; i++) {
-        const x1 = (student.transactions[i].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
-        const x2 = (student.transactions[i + 1].createdAt.getTime() - firstTransactionDate) / firstAndLastDateDiff * 1000
+        const y1 = student.transactions[i - 1].totalXP / student.totalXP * 500
+        const y2 = student.transactions[i].totalXP / student.totalXP * 500
 
-        const y1 = student.transactions[i].totalXP / student.totalXP * 500
-        const y2 = student.transactions[i + 1].totalXP / student.totalXP * 500
+        xpOverDateGraph.data.push({
+            type: 'circle', cx: x2, cy: y2,
+            text: `${student.transactions[i].totalXP.toLocaleString()} XP\n${student.transactions[i].createdAt.toLocaleDateString("en-GB")}`
+        })
 
-        const circle = document.createElement('circle')
-        data.append(circle)
-        circle.setAttribute('cx', x2 + 100)
-        circle.setAttribute('cy', 500 - y2)
-        circle.setAttribute('r', 4)
-        circle.innerHTML = `
-        <title>
-            ${student.transactions[i].totalXP.toLocaleString()} XP
-            ${student.transactions[i].createdAt.toLocaleDateString()}
-        </title>
-        `
-
-        const line = document.createElement('line')
-        data.append(line)
-        line.setAttribute('x1', x1 + 100)
-        line.setAttribute('x2', x2 + 100)
-        line.setAttribute('y1', 500 - y1)
-        line.setAttribute('y2', 500 - y2)
+        xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
     }
 
-    document.body.innerHTML += container.innerHTML
+    const drawGraph = (graph) => {
+        const container = document.createElement('div')
+
+        const svg = document.createElement('svg')
+        container.append(svg)
+        svg.classList.add('graph')
+
+        const xGrid = document.createElement('g')
+        svg.append(xGrid)
+        xGrid.classList.add('grid', 'x-grid')
+
+        const yGrid = document.createElement('g')
+        svg.append(yGrid)
+        yGrid.classList.add('grid', 'y-grid')
+
+        const xLine = document.createElement('line')
+        xGrid.append(xLine)
+        xLine.setAttribute('x1', graph.leftOffset)
+        xLine.setAttribute('x2', graph.leftOffset)
+        xLine.setAttribute('y1', 0)
+        xLine.setAttribute('y2', graph.topOffset)
+
+        const yLine = document.createElement('line')
+        yGrid.append(yLine)
+        yLine.setAttribute('x1', graph.leftOffset)
+        yLine.setAttribute('x2', graph.width + graph.leftOffset)
+        yLine.setAttribute('y1', graph.topOffset)
+        yLine.setAttribute('y2', graph.topOffset)
+
+        const xLabels = document.createElement('g')
+        svg.append(xLabels)
+        xLabels.classList.add('labels', 'x-labels')
+
+        const yLabels = document.createElement('g')
+        svg.append(yLabels)
+        yLabels.classList.add('labels', 'y-labels')
+
+        for (let i = 0; i < graph.labels.length; i++) {
+            const label = document.createElement('text')
+
+            label.setAttribute('x', graph.labels[i].x)
+            label.setAttribute('y', graph.labels[i].y)
+            label.innerText = graph.labels[i].text
+
+            if (graph.labels[i].type == 'x-label') {
+                xLabels.append(label)
+            }
+            if (graph.labels[i].type == 'y-label') {
+                yLabels.append(label)
+            }
+        }
+
+        const data = document.createElement('g')
+        svg.append(data)
+        data.classList.add('data')
+
+        for (let i = 0; i < graph.data.length; i++) {
+            const el = document.createElement(graph.data[i].type)
+            data.append(el)
+
+            if (graph.data[i].type == 'circle') {
+                el.setAttribute('cx', graph.data[i].cx + graph.leftOffset)
+                el.setAttribute('cy', graph.topOffset - graph.data[i].cy)
+                el.setAttribute('r', 4)
+                el.innerHTML = `<title>${graph.data[i].text}</title>`
+            }
+
+            if (graph.data[i].type == 'line') {
+                el.setAttribute('x1', graph.data[i].x1 + graph.leftOffset)
+                el.setAttribute('x2', graph.data[i].x2 + graph.leftOffset)
+                el.setAttribute('y1', graph.topOffset - graph.data[i].y1)
+                el.setAttribute('y2', graph.topOffset - graph.data[i].y2)
+            }
+        }
+        
+        document.body.innerHTML += container.innerHTML
+    }
+
+    drawGraph(xpOverDateGraph)
 })();
