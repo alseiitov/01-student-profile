@@ -6,8 +6,23 @@
         id: 0,
         login: 'alseiitov',
         transactions: [],
-        totalXP: 0
+        totalXP: 0,
+        level: 0
     }
+
+    const levelChanges = [];
+
+    // total xp needed for this level
+    const totalXPForLevel = level =>
+        Math.round((level * 0.66 + 1) * ((level + 2) * 150 + 50))
+
+    // cumul of all the xp needed to reach this level
+    const cumulXpForLevel = level =>
+        level > 0 ? totalXPForLevel(level) + cumulXpForLevel(level - 1) : 0
+
+    // level reached for this xp
+    const getLevelFromXp = (xp, level = 0) =>
+        cumulXpForLevel(level) >= xp ? level : getLevelFromXp(xp, level + 1)
 
     const parse = async (query, variables) => {
         const response = await fetch(GRAPHQL_ENDPOINT, {
@@ -70,12 +85,24 @@
 
         student.totalXP += transaction.amount
         transaction.totalXP = student.totalXP
+
+        const level = getLevelFromXp(transaction.totalXP)
+        if (level > student.level) {
+            levelChanges.push({ level, date: transaction.createdAt })
+            student.level = level
+        }
     })
 
-    document.getElementById('login').innerText = `login: ${student.login}`
-    document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
-
     const xpOverDateGraph = {
+        width: 1000,
+        height: 500,
+        topOffset: 500,
+        leftOffset: 100,
+        labels: [],
+        data: [],
+    }
+
+    const levelOverDateGraph = {
         width: 1000,
         height: 500,
         topOffset: 500,
@@ -113,6 +140,7 @@
 
     const months = getMonths(firstDate, lastDate)
 
+    // labels for dates
     for (let i = 0; i < months.length; i++) {
         const x = (i / (months.length - 1) * xpOverDateGraph.width) + xpOverDateGraph.leftOffset
         const y = xpOverDateGraph.height + 30
@@ -120,17 +148,30 @@
         const type = 'x-label'
 
         xpOverDateGraph.labels.push({ x, y, text, type })
+        levelOverDateGraph.labels.push({ x, y, text, type })
     }
 
+    // labels for xp of xp over date graph
     for (let i = 0; i <= 10; i++) {
         const x = xpOverDateGraph.leftOffset * 0.8
-        const y = i == 0 ? xpOverDateGraph.height + 10 : xpOverDateGraph.height - 50 - ((10 - i) * 50) + 10
-        const text = (i == 0 ? 0 : Math.round(student.totalXP / i)).toLocaleString()
+        const y = (i == 0 ? 0 : xpOverDateGraph.height * (i / 10)) + 5
+        const text = (i == 10 ? 0 : Math.round(student.totalXP * (1 - (i / 10)))).toLocaleString()
         const type = 'y-label'
 
         xpOverDateGraph.labels.push({ x, y, text, type })
     }
 
+    // labels for levels of level over date graph
+    for (let i = 0; i <= student.level; i++) {
+        const x = levelOverDateGraph.leftOffset * 0.8
+        const y = (i == 0 ? levelOverDateGraph.height : (levelOverDateGraph.height * (1 - (i / student.level)))) + 5
+        const text = i
+        const type = 'y-label'
+
+        levelOverDateGraph.labels.push({ x, y, text, type })
+    }
+
+    // data for xp over date graph
     for (let i = 1; i < student.transactions.length; i++) {
         const x1 = (student.transactions[i - 1].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
         const x2 = (student.transactions[i].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
@@ -143,7 +184,32 @@
             text: `${student.transactions[i].totalXP.toLocaleString()} XP\n${student.transactions[i].createdAt.toLocaleDateString("en-GB")}`
         })
 
-        xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
+        if (i > 1) {
+            xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
+        }
+    }
+
+    // data for level over date graph
+    for (let i = 0; i < levelChanges.length - 1; i++) {
+        const x1 = (levelChanges[i].date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+        const x2 = (levelChanges[i + 1].date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+
+        const y1 = (levelChanges[i].level) / (student.level) * levelOverDateGraph.height
+        const y2 = (levelChanges[i + 1].level) / (student.level) * levelOverDateGraph.height
+
+        if (i == 0) {
+            levelOverDateGraph.data.push({
+                type: 'circle', cx: x1, cy: y1,
+                text: `0 → ${levelChanges[i].level} level\n${levelChanges[i].date.toLocaleDateString("en-GB")}`
+            })
+        }
+
+        levelOverDateGraph.data.push({
+            type: 'circle', cx: x2, cy: y2,
+            text: `${levelChanges[i].level} → ${levelChanges[i + 1].level} level\n${levelChanges[i + 1].date.toLocaleDateString("en-GB")}`
+        })
+
+        levelOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
     }
 
     const drawGraph = (graph) => {
@@ -224,5 +290,10 @@
         document.body.innerHTML += container.innerHTML
     }
 
+    document.getElementById('login').innerText = `login: ${student.login}`
+    document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
+    document.getElementById('level').innerText = `level: ${student.level}`
+
     drawGraph(xpOverDateGraph)
+    drawGraph(levelOverDateGraph)
 })();

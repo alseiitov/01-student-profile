@@ -6,6 +6,11 @@ p {
   font-size: 20px;
 }
 
+svg {
+  width:  auto;
+  height: auto;
+}
+
 .graph .labels.x-labels {
   text-anchor: middle;
 }
