@@ -1,4 +1,3 @@
-
 const SCHOOL_DOMAIN = '01.alem.school'
 const GRAPHQL_ENDPOINT = `https://${SCHOOL_DOMAIN}/api/graphql-engine/v1/graphql`
 
@@ -160,15 +159,18 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
 
     // data for "xp over date" graph
     for (let i = 1; i < student.transactions.length; i++) {
-        const x1 = (student.transactions[i - 1].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
-        const x2 = (student.transactions[i].createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const curr = student.transactions[i]
+        const prev = student.transactions[i - 1]
 
-        const y1 = student.transactions[i - 1].totalXP / student.totalXP * xpOverDateGraph.height
-        const y2 = student.transactions[i].totalXP / student.totalXP * xpOverDateGraph.height
+        const x1 = (prev.createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const x2 = (curr.createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+
+        const y1 = prev.totalXP / student.totalXP * xpOverDateGraph.height
+        const y2 = curr.totalXP / student.totalXP * xpOverDateGraph.height
 
         xpOverDateGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
-            text: `${student.transactions[i].totalXP.toLocaleString()} XP\n${student.transactions[i].createdAt.toLocaleDateString("en-GB")}`
+            text: `${curr.totalXP.toLocaleString()} XP\n${curr.createdAt.toLocaleDateString("en-GB")}`
         })
 
         if (i > 1) {
@@ -178,22 +180,25 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
 
     // data for "level over date" graph
     for (let i = 0; i < levelChanges.length - 1; i++) {
-        const x1 = (levelChanges[i].date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
-        const x2 = (levelChanges[i + 1].date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+        const curr = levelChanges[i]
+        const next = levelChanges[i + 1]
 
-        const y1 = (levelChanges[i].level) / (student.level) * levelOverDateGraph.height
-        const y2 = (levelChanges[i + 1].level) / (student.level) * levelOverDateGraph.height
+        const x1 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+        const x2 = (next.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+
+        const y1 = (curr.level) / (student.level) * levelOverDateGraph.height
+        const y2 = (next.level) / (student.level) * levelOverDateGraph.height
 
         if (i == 0) {
             levelOverDateGraph.data.push({
                 type: 'circle', cx: x1, cy: y1,
-                text: `0 → ${levelChanges[i].level} level\n${levelChanges[i].date.toLocaleDateString("en-GB")}`
+                text: `0 → ${curr.level} level\n${curr.date.toLocaleDateString("en-GB")}`
             })
         }
 
         levelOverDateGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
-            text: `${levelChanges[i].level} → ${levelChanges[i + 1].level} level\n${levelChanges[i + 1].date.toLocaleDateString("en-GB")}`
+            text: `${curr.level} → ${next.level} level\n${next.date.toLocaleDateString("en-GB")}`
         })
 
         levelOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
