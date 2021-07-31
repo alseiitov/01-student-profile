@@ -4,12 +4,16 @@ const GRAPHQL_ENDPOINT = `https://${SCHOOL_DOMAIN}/api/graphql-engine/v1/graphql
 const student = {
     id: 0,
     login: 'alseiitov',
-    transactions: [],
     totalXP: 0,
-    level: 0
+    level: 0,
+    transactions: [],
+    progresses: [],
+    doneProjects: [],
 }
 
 const levelChanges = [];
+
+const projectsBaseXP = {}
 
 const fetchGraphQL = async (query, variables) => {
     const response = await fetch(GRAPHQL_ENDPOINT, {
@@ -21,44 +25,56 @@ const fetchGraphQL = async (query, variables) => {
     return await response.json()
 }
 
-const parseData = async () => {
+const parseUserInfo = async () => {
+    const obj = await fetchGraphQL(`
+        query get_user($login: String) {
+            user(where: {login: {_eq: $login}}) {
+                id
+                login
+            }
+        }`,
+        {
+            login: student.login,
+        }
+    )
+
+    student.id = obj.data.user[0].id
+    student.login = obj.data.user[0].login
+}
+
+const parseTransactions = async () => {
     let offset = 0
 
     while (true) {
         const obj = await fetchGraphQL(`
-            query user($login: String, $offset: Int) {
-                user(where: {login: {_eq: $login}}) {
-                  id
-                  login
-                  transactions(
-                    where: {type: {_eq: "xp"}, object: {type: {_eq: "project"}}}
-                    offset: $offset
-                  ) {
-                    object {
-                      id
-                      name
-                    }
-                    type
-                    amount
-                    createdAt
-                  }
+            query get_transactions($login: String, $offset: Int) {
+                transaction(
+                    where: {
+                    user: { login: { _eq: $login } }
+                    type: { _eq: "xp" }
+                    object: { type: { _eq: "project" } }
                 }
-              }          
-            `,
+                offset: $offset
+            ) {
+                object {
+                    id
+                    name
+                }
+                amount
+                createdAt
+                }
+            }`,
             {
                 login: student.login,
                 offset: offset
             }
         )
 
+        student.transactions.push(...obj.data.transaction)
+
         offset += 50
 
-        student.id = obj.data.user[0].id
-
-        const transactions = obj.data.user[0].transactions
-        student.transactions.push(...transactions)
-
-        if (transactions.length < 50) {
+        if (obj.data.transaction.length < 50) {
             offset = 0
             break
         }
@@ -67,20 +83,82 @@ const parseData = async () => {
     student.transactions.sort((a, b) =>
         new Date(a.createdAt) > new Date(b.createdAt) ? 1 : -1
     )
+}
 
+const parseProgresses = async () => {
+    let offset = 0
+
+    while (true) {
+        const obj = await fetchGraphQL(`
+            query get_progresses($login: String, $offset: Int) {
+                progress(
+                    where: {
+                        user: { login: { _eq: $login } }
+                        isDone: { _eq: true }
+                        object: { type: { _eq: "project" } }
+                    }
+                    distinct_on: objectId
+                    offset: $offset
+                ) {
+                    object {
+                        id
+                        name
+                    }
+                }
+            }`,
+            {
+                login: student.login,
+                offset: offset,
+            }
+        )
+
+        student.progresses.push(...obj.data.progress)
+
+        offset += 50
+
+        if (obj.data.progress.length < 50) {
+            offset = 0
+            break
+        }
+    }
+}
+
+const parseProjectsBaseXP = () => {
     student.transactions.forEach(transaction => {
-        transaction.createdAt = new Date(transaction.createdAt)
-
-        student.totalXP += transaction.amount
-        transaction.totalXP = student.totalXP
-
-        const level = getLevelFromXp(transaction.totalXP)
-        if (level > student.level) {
-            levelChanges.push({ level, date: transaction.createdAt })
-            student.level = level
+        if (student.progresses.find(progress => progress.object.id == transaction.object.id)) {
+            if (!projectsBaseXP[transaction.object.id]) {
+                projectsBaseXP[transaction.object.id] = transaction.amount
+            } else if (projectsBaseXP[transaction.object.id] < transaction.amount) {
+                projectsBaseXP[transaction.object.id] = transaction.amount
+            }
         }
     })
 }
+
+const parseDoneProjects = () => {
+    student.transactions.forEach(transaction => {
+        const projectBaseXP = projectsBaseXP[transaction.object.id]
+
+        if (projectsBaseXP && projectBaseXP == transaction.amount) {
+            student.totalXP += projectBaseXP
+            const newLevel = getLevelFromXp(student.totalXP)
+            
+            if (newLevel > student.level) {
+                student.level = newLevel
+                levelChanges.push({ level: newLevel, date: new Date(transaction.createdAt) })
+            }
+
+            student.doneProjects.push({
+                id: transaction.object.id,
+                name: transaction.object.name,
+                baseXP: projectBaseXP,
+                totalXP: student.totalXP,
+                date: new Date(transaction.createdAt)
+            })
+        }
+    })
+
+    student.doneProjects.sort((a, b) => a.date > b.date ? 1 : -1 )}
 
 // total xp needed for this level
 const totalXPForLevel = (level) => Math.round((level * 0.66 + 1) * ((level + 2) * 150 + 50))
@@ -120,8 +198,8 @@ const getMonths = (fromDate, toDate) => {
 
 // prepare graphs before drawing
 const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
-    const firstDate = getFirstDayOfMonth(student.transactions[0].createdAt)
-    const lastDate = getFirstDayOfNextMonth(student.transactions[student.transactions.length - 1].createdAt)
+    const firstDate = getFirstDayOfMonth(student.doneProjects[0].date)
+    const lastDate = getFirstDayOfNextMonth(student.doneProjects[student.doneProjects.length - 1].date)
     const firstAndLastDateDiff = lastDate.getTime() - firstDate.getTime()
 
     const months = getMonths(firstDate, lastDate)
@@ -158,24 +236,35 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
     }
 
     // data for "xp over date" graph
-    for (let i = 1; i < student.transactions.length; i++) {
-        const curr = student.transactions[i]
-        const prev = student.transactions[i - 1]
+    for (let i = 1; i < student.doneProjects.length; i++) {
+        const curr = student.doneProjects[i]
+        const prev = student.doneProjects[i - 1]
 
-        const x1 = (prev.createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
-        const x2 = (curr.createdAt.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const x1 = (prev.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const x2 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
 
         const y1 = prev.totalXP / student.totalXP * xpOverDateGraph.height
         const y2 = curr.totalXP / student.totalXP * xpOverDateGraph.height
 
+        if (i == 1) {
+            xpOverDateGraph.data.push({
+                type: 'circle', cx: x1, cy: y1,
+                text: `0 → ${prev.totalXP.toLocaleString()} XP\n${prev.date.toLocaleDateString("en-GB")}`
+            })
+
+            xpOverDateGraph.data.push({
+                type: 'line',
+                x1: 0, x2: x1,
+                y1: 0, y2: y1
+            })
+        }
+
         xpOverDateGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
-            text: `${curr.totalXP.toLocaleString()} XP\n${curr.createdAt.toLocaleDateString("en-GB")}`
+            text: `${prev.totalXP.toLocaleString()} → ${curr.totalXP.toLocaleString()} XP\n${curr.date.toLocaleDateString("en-GB")}`
         })
 
-        if (i > 1) {
-            xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
-        }
+        xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
     }
 
     // data for "level over date" graph
@@ -193,6 +282,12 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
             levelOverDateGraph.data.push({
                 type: 'circle', cx: x1, cy: y1,
                 text: `0 → ${curr.level} level\n${curr.date.toLocaleDateString("en-GB")}`
+            })
+
+            levelOverDateGraph.data.push({
+                type: 'line',
+                x1: 0, x2: x1,
+                y1: 0, y2: y1
             })
         }
 
@@ -284,7 +379,12 @@ const drawGraph = (graph) => {
 }
 
 const init = async () => {
-    await parseData()
+    await parseUserInfo()
+    await parseTransactions()
+    await parseProgresses()
+
+    parseProjectsBaseXP()
+    parseDoneProjects()
 
     document.getElementById('login').innerText = `login: ${student.login}`
     document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
@@ -315,3 +415,4 @@ const init = async () => {
 }
 
 init()
+
