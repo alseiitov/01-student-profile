@@ -197,7 +197,7 @@ const getMonths = (fromDate, toDate) => {
 }
 
 // prepare graphs before drawing
-const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
+const fillGraphs = (xpOverTimeGraph, levelOverTimeGraph) => {
     const firstDate = getFirstDayOfMonth(student.doneProjects[0].date)
     const lastDate = getFirstDayOfNextMonth(student.doneProjects[student.doneProjects.length - 1].date)
     const firstAndLastDateDiff = lastDate.getTime() - firstDate.getTime()
@@ -206,33 +206,33 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
 
     // labels for dates
     for (let i = 0; i < months.length; i++) {
-        const x = (i / (months.length - 1) * xpOverDateGraph.width) + xpOverDateGraph.leftOffset
-        const y = xpOverDateGraph.height + 30
+        const x = (i / (months.length - 1) * xpOverTimeGraph.width) + xpOverTimeGraph.leftOffset
+        const y = xpOverTimeGraph.height + 30
         const text = months[i]
         const type = 'x-label'
 
-        xpOverDateGraph.labels.push({ x, y, text, type })
-        levelOverDateGraph.labels.push({ x, y, text, type })
+        xpOverTimeGraph.labels.push({ x, y, text, type })
+        levelOverTimeGraph.labels.push({ x, y, text, type })
     }
 
     // labels for xp of "xp over date" graph
     for (let i = 0; i <= 10; i++) {
-        const x = xpOverDateGraph.leftOffset * 0.8
-        const y = (i == 0 ? 0 : xpOverDateGraph.height * (i / 10)) + 5
+        const x = xpOverTimeGraph.leftOffset * 0.8
+        const y = (i == 0 ? 0 : xpOverTimeGraph.height * (i / 10)) + 5
         const text = (i == 10 ? 0 : Math.round(student.totalXP * (1 - (i / 10)))).toLocaleString()
         const type = 'y-label'
 
-        xpOverDateGraph.labels.push({ x, y, text, type })
+        xpOverTimeGraph.labels.push({ x, y, text, type })
     }
 
     // labels for levels of "level over date" graph
     for (let i = 0; i <= student.level; i++) {
-        const x = levelOverDateGraph.leftOffset * 0.8
-        const y = (i == 0 ? levelOverDateGraph.height : (levelOverDateGraph.height * (1 - (i / student.level)))) + 5
+        const x = levelOverTimeGraph.leftOffset * 0.8
+        const y = (i == 0 ? levelOverTimeGraph.height : (levelOverTimeGraph.height * (1 - (i / student.level)))) + 5
         const text = i
         const type = 'y-label'
 
-        levelOverDateGraph.labels.push({ x, y, text, type })
+        levelOverTimeGraph.labels.push({ x, y, text, type })
     }
 
     // data for "xp over date" graph
@@ -240,31 +240,31 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
         const curr = student.doneProjects[i]
         const prev = student.doneProjects[i - 1]
 
-        const x1 = (prev.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
-        const x2 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverDateGraph.width
+        const x1 = (prev.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverTimeGraph.width
+        const x2 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * xpOverTimeGraph.width
 
-        const y1 = prev.totalXP / student.totalXP * xpOverDateGraph.height
-        const y2 = curr.totalXP / student.totalXP * xpOverDateGraph.height
+        const y1 = prev.totalXP / student.totalXP * xpOverTimeGraph.height
+        const y2 = curr.totalXP / student.totalXP * xpOverTimeGraph.height
 
         if (i == 1) {
-            xpOverDateGraph.data.push({
+            xpOverTimeGraph.data.push({
                 type: 'circle', cx: x1, cy: y1,
                 text: `0 → ${prev.totalXP.toLocaleString()} XP\n${prev.date.toLocaleDateString("en-GB")}`
             })
 
-            xpOverDateGraph.data.push({
+            xpOverTimeGraph.data.push({
                 type: 'line',
                 x1: 0, x2: x1,
                 y1: 0, y2: y1
             })
         }
 
-        xpOverDateGraph.data.push({
+        xpOverTimeGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
             text: `${prev.totalXP.toLocaleString()} → ${curr.totalXP.toLocaleString()} XP\n${curr.date.toLocaleDateString("en-GB")}`
         })
 
-        xpOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
+        xpOverTimeGraph.data.push({ type: 'line', x1, x2, y1, y2 })
     }
 
     // data for "level over date" graph
@@ -272,40 +272,50 @@ const fillGraphs = (xpOverDateGraph, levelOverDateGraph) => {
         const curr = levelChanges[i]
         const next = levelChanges[i + 1]
 
-        const x1 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
-        const x2 = (next.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverDateGraph.width
+        const x1 = (curr.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverTimeGraph.width
+        const x2 = (next.date.getTime() - firstDate) / firstAndLastDateDiff * levelOverTimeGraph.width
 
-        const y1 = (curr.level) / (student.level) * levelOverDateGraph.height
-        const y2 = (next.level) / (student.level) * levelOverDateGraph.height
+        const y1 = (curr.level) / (student.level) * levelOverTimeGraph.height
+        const y2 = (next.level) / (student.level) * levelOverTimeGraph.height
 
         if (i == 0) {
-            levelOverDateGraph.data.push({
+            levelOverTimeGraph.data.push({
                 type: 'circle', cx: x1, cy: y1,
                 text: `0 → ${curr.level} level\n${curr.date.toLocaleDateString("en-GB")}`
             })
 
-            levelOverDateGraph.data.push({
+            levelOverTimeGraph.data.push({
                 type: 'line',
                 x1: 0, x2: x1,
                 y1: 0, y2: y1
             })
         }
 
-        levelOverDateGraph.data.push({
+        levelOverTimeGraph.data.push({
             type: 'circle', cx: x2, cy: y2,
             text: `${curr.level} → ${next.level} level\n${next.date.toLocaleDateString("en-GB")}`
         })
 
-        levelOverDateGraph.data.push({ type: 'line', x1, x2, y1, y2 })
+        levelOverTimeGraph.data.push({ type: 'line', x1, x2, y1, y2 })
     }
 }
 
 const drawGraph = (graph) => {
     const container = document.createElement('div')
+    container.classList.add('graph-container')
+
+    const description = document.createElement('p')
+    description.classList.add('graph-description')
+    description.innerText = graph.description
+    container.appendChild(description)
 
     const svg = document.createElement('svg')
     container.append(svg)
     svg.classList.add('graph')
+    svg.setAttribute('preserveAspectRatio', 'none')
+    svg.setAttribute('width', '100%')
+    svg.setAttribute('height', '100%')
+    svg.setAttribute('viewbox', '0 0 '+1100 +' '+ 600)
 
     const xGrid = document.createElement('g')
     svg.append(xGrid)
@@ -363,7 +373,7 @@ const drawGraph = (graph) => {
         if (graph.data[i].type == 'circle') {
             el.setAttribute('cx', graph.data[i].cx + graph.leftOffset)
             el.setAttribute('cy', graph.topOffset - graph.data[i].cy)
-            el.setAttribute('r', 4)
+            el.setAttribute('r', 5)
             el.innerHTML = `<title>${graph.data[i].text}</title>`
         }
 
@@ -375,7 +385,7 @@ const drawGraph = (graph) => {
         }
     }
 
-    document.body.innerHTML += container.innerHTML
+    document.body.innerHTML += container.outerHTML
 }
 
 const init = async () => {
@@ -386,11 +396,13 @@ const init = async () => {
     parseProjectsBaseXP()
     parseDoneProjects()
 
-    document.getElementById('login').innerText = `login: ${student.login}`
-    document.getElementById('total-xp').innerText = `total xp: ${student.totalXP.toLocaleString()}`
-    document.getElementById('level').innerText = `level: ${student.level}`
+    document.getElementById('login').innerText = `${student.login}`
+    document.getElementById('id').innerText = `${student.id}`
+    document.getElementById('total-xp').innerText = `${student.totalXP.toLocaleString()}`
+    document.getElementById('level').innerText = `${student.level}`
 
-    const xpOverDateGraph = {
+    const xpOverTimeGraph = {
+        description: 'XP OVER TIME',
         width: 1000,
         height: 500,
         topOffset: 500,
@@ -399,7 +411,8 @@ const init = async () => {
         data: [],
     }
 
-    const levelOverDateGraph = {
+    const levelOverTimeGraph = {
+        description: "LEVEL OVER TIME",
         width: 1000,
         height: 500,
         topOffset: 500,
@@ -408,10 +421,10 @@ const init = async () => {
         data: [],
     }
 
-    fillGraphs(xpOverDateGraph, levelOverDateGraph)
+    fillGraphs(xpOverTimeGraph, levelOverTimeGraph)
 
-    drawGraph(xpOverDateGraph)
-    drawGraph(levelOverDateGraph)
+    drawGraph(xpOverTimeGraph)
+    drawGraph(levelOverTimeGraph)
 }
 
 init()
